@@ -84,8 +84,6 @@ open class _NavigationController {
 
     public var isLastRoute: Bool { navHostController.previousBackStackEntry == nil }
 
-    public var backQueue: [NavHostCore.BackStackEntry] { navHostController.currentBackStack }
-
     func currentRoute(_ copyArgument: Bool = false) -> NavigationRouteManager.Route? {
         let _entry: NavHostCore.BackStackEntry?
         if isIdle || isNavigatingBack {

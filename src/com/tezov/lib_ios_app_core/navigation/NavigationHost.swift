@@ -1,4 +1,3 @@
-
 import SwiftUI
 import lib_ios_core
 
@@ -27,13 +26,22 @@ public struct NavHost: View {
     public var body: some View {
 
         let _ = {
-            print("build navgraph")
+
+            print("******************")
             let _builder = NavHostCore.Graph.Builder(
                 providers: navController.navHostController.providers,
                 startDestination: startRoute.path
             )
             builder(_builder)
-            let _ = _builder.build()
+            print("******************")
+
+            let graph = _builder.build()
+            
+//            graph.moveTo(route: "cart")
+            graph.moveTo(route: "navAuth")
+            
+            
+            
         }()
         
         //    NavHost(
@@ -58,15 +66,8 @@ public struct NavHost: View {
 //    animationConfig _: NavigationAnimation.Config,
 //    graph _: NavGraph
 //) {
-//    val lifecycleOwner = LocalLifecycleOwner.current
-//    val viewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current) {
-//        "NavHost requires a ViewModelStoreOwner to be provided via LocalViewModelStoreOwner"
-//    }
 //    val navHostController = navController.navHostController
-//    navHostController.setLifecycleOwner(lifecycleOwner)
-//    navHostController.setViewModelStore(viewModelStoreOwner.viewModelStore)
 //    navHostController.graph = graph
-//    val saveableStateHolder = rememberSaveableStateHolder()
 //    remember {
 //        NavHost(
 //            saveableStateHolder = saveableStateHolder,
