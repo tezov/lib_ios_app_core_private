@@ -1,94 +1,104 @@
-import SwiftUI
 import lib_ios_core
+import SwiftUI
 
 public struct NavHost: View {
-    
-    let navController: NavigationController.Core
-    let route: NavigationRouteManager.Route?
-    let startRoute: NavigationRouteManager.Route
-    let animationConfig: NavigationAnimation.Config
-    let builder: (NavHostCore.Graph.Builder) -> Void
+    @State @Lazy private var state = NavHostState()
     
     public init(
-        navController : NavigationController.Core,
-        route : NavigationRouteManager.Route? = nil,
-        startRoute : NavigationRouteManager.Route,
-        animationConfig : NavigationAnimation.Config = NavigationAnimation.Config(),
-        builder : @escaping (NavHostCore.Graph.Builder) -> Void
+        navController: NavigationController.Core,
+        route: NavigationRouteManager.Route? = nil,
+        startRoute: NavigationRouteManager.Route,
+        animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
+        builder: @escaping (NavHostCore.Graph.Builder) -> Void
     ) {
-        self.navController = navController
-        self.route = route
-        self.startRoute = startRoute
-        self.animationConfig = animationConfig
-        self.builder = builder
+        state.update(
+            navController: navController,
+            route: route,
+            startRoute: startRoute,
+            animationConfig: animationConfig,
+            builder: builder
+        )
     }
     
     public var body: some View {
+        state.remember()
+    }
+}
 
-        let _ = {
-
-            let _builder = NavHostCore.Graph.Builder(
+private class NavHostState {
+    private var value: NavHostImpl? = nil
+    
+    var navController: NavigationController.Core!
+    var route: NavigationRouteManager.Route?
+    var startRoute: NavigationRouteManager.Route!
+    var animationConfig: NavigationAnimation.Config!
+    var builder: ((NavHostCore.Graph.Builder) -> Void)!
+    
+    func update(
+        navController: NavigationController.Core,
+        route: NavigationRouteManager.Route? = nil,
+        startRoute: NavigationRouteManager.Route,
+        animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
+        builder: @escaping (NavHostCore.Graph.Builder) -> Void
+    ) {
+        if value == nil {
+            self.navController = navController
+            self.route = route
+            self.startRoute = startRoute
+            self.animationConfig = animationConfig
+            self.builder = builder
+        }
+    }
+    
+    func remember() -> NavHostImpl {
+        return value ?? {
+            let graphBuilder = NavHostCore.Graph.Builder(
                 providers: navController.navHostController.providers,
                 startDestination: startRoute.path
             )
-            builder(_builder)
-            navController.navHostController.graph = _builder.build()
-            
-            
-            navController.navHostController.navigate(route: "cart")
-            navController.navHostController.navigate(route: "check")
-//            navController.navHostController.popBackStack()
-            navController.navHostController.navigate(route: "menu")
-            navController.navHostController.navigate(route: "check")
-            navController.navHostController.navigate(route: "check")
-            navController.navHostController.navigate(route: "check")
-            navController.navHostController.navigate(route: "navLobby")
-            navController.navHostController.navigate(route: "navAuth")
-            navController.navHostController.navigate(route: "navLobby")
-
-            
-            
-            
-            
+            builder(graphBuilder)
+            navController.navHostController.graph = graphBuilder.build()
+            value = NavHostImpl(
+                navController: navController,
+                animationConfig: animationConfig
+            )
+            return value!
         }()
-        
-        //    NavHost(
-        //        navController = navController,
-        //        animationConfig = animationConfig,
-        //        graph = remember(route?.path, startRoute.path, builder) {
-        //            navController.navHostController.createGraph(
-        //                startDestination = startRoute.path,
-        //                route = route?.path,
-        //                builder = builder,
-        //            )
-        //        },
-        //    )
-        
-        Text("Hello World")
     }
-  
+    
 }
 
-//private func NavHost(
-//    navController _: NavigationController,
-//    animationConfig _: NavigationAnimation.Config,
-//    graph _: NavGraph
-//) {
-//    val navHostController = navController.navHostController
-//    navHostController.graph = graph
-//    remember {
-//        NavHost(
-//            saveableStateHolder = saveableStateHolder,
-//            navController = navController,
-//            animationConfig = animationConfig
-//        )
-//    }.also {
-//        it.compose(
-//            backQueue = navController.backQueue,
-//            visibleEntries = navHostController.visibleEntries,
-//        )
-//    }
-//}
+public struct NavHostImpl: View {
+    private let navController: NavigationController.Core
+    private let animationConfig: NavigationAnimation.Config
+    
+    init(navController: NavigationController.Core, animationConfig: NavigationAnimation.Config) {
+        self.navController = navController
+        self.animationConfig = animationConfig
+    }
+    
+    private var entries: [NavHostCore.BackStackEntry] = []
+    private var lastEntryId: String?
+    
+    var isNavigatingBack: Bool { navController.isNavigatingBack }
+    
+    func isLastEntry(entry: NavHostCore.BackStackEntry) -> Bool { entry.id == lastEntryId }
+    
+    private var indexOfLastEntry: Int? { entries.lastIndex { $0.id == lastEntryId } }
+    
+    var lastEntry: NavHostCore.BackStackEntry? { entries.last { $0.id == lastEntryId } }
+    
+    public var body: some View {
+        Text("Hello World ").onTapGesture {
+            
+            
+        }
+    }
+    
+
+    
+}
+
 
 internal class _NavHost {
     private let navController: NavigationController.Core
@@ -370,5 +380,3 @@ internal class _NavHost {
 //        transition.start()
 //    }
 }
-
-

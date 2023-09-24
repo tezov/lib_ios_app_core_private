@@ -48,7 +48,6 @@ public class _NavHostCore_Controller: ObservableObject {
                 currentGraphNode = graph
                 let entry = NavHostCore.BackStackEntry(destination: destination)
                 _backQueue.append(entry)
-                //visibleEntries.append(entry)
             }
         }
     }
@@ -78,24 +77,39 @@ public class _NavHostCore_Controller: ObservableObject {
         return _backQueue[_backQueue.count - 2]
     }
 
-    func navigate(route: String, option _: NavHostCore.Option? = nil) {
-        // todo option
-
-        guard let graph else { fatalError("graph is nil, you forgot to set it inside NavHost View") }
+    func navigate(route: String, option: NavHostCore.Option? = nil) {
+        guard graph != nil else { fatalError("graph is nil, you forgot to set it inside NavHost View") }
         guard let (newNode, destination) = currentGraphNode.resolve(route: route)
         else { fatalError("invalid navigate request from \(currentBackStackEntry?.destination.route ?? "root") to \(route)") }
+        if let option {
+            if option.clearStack {
+                _backQueue.removeAll()
+            }
+            if option.singleTop {
+                _backQueue.removeAll { entry in
+                    entry.destination.route == route
+                }
+            }
+            if let popUpToRoute = option.popUpToRoute {
+                if var indexOfPopUpToRoute = (_backQueue.lastIndex { entry in
+                    entry.destination.route == popUpToRoute
+                }) {
+                    if !option.popUpInclusive {
+                        indexOfPopUpToRoute += 1
+                    }
+                    _backQueue = Array(_backQueue[0..<indexOfPopUpToRoute])
+                }
+            }
+        }
         currentGraphNode = newNode
         let entry = NavHostCore.BackStackEntry(destination: destination)
-        _backQueue.append(entry)
-        //visibleEntries.append(entry)
         
-        print("\(destination.route ?? "nil") \(_backQueue.count)")
-
+        _backQueue.append(entry)
+        objectWillChange.send()
     }
 
     func popBackStack() {
         _backQueue.removeLast()
-        
     }
 }
 
@@ -135,11 +149,11 @@ public class _NavHostCore_Graph {
     private func firstDestination(route: String, graph: NavHostCore.Graph) -> NavHostCore.Destination? {
         graph.destinations.first { $0.route == route }
     }
-    
+
     private func firstGraph(route: String, graph: NavHostCore.Graph) -> NavHostCore.Graph? {
         graph.childs.first { $0.route == route || $0.startDestination == route }
     }
-    
+
     func resolve(route: String) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
         var result = resolve(route: route, graph: self)
         if result == nil {
@@ -255,10 +269,10 @@ public class _NavHostCore_BackStackEntry {
 }
 
 public class _NavHostCore_Option {
-    public let clearStack: Bool?
-    public let singleTop: Bool?
+    public let clearStack: Bool
+    public let singleTop: Bool
     public let popUpToRoute: String?
-    public let popUpInclusive: Bool?
+    public let popUpInclusive: Bool
 
     init(
         clearStack: Bool,
