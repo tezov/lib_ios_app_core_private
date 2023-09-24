@@ -72,8 +72,8 @@ open class _NavigationController {
 
     private var currentRequest: NavigationController.Request? {
         didSet {
-            if let newValue = currentRequest {
-                isNavigatingBack = newValue.to is NavigationRouteManager.Route.Back
+            if let currentRequest {
+                isNavigatingBack = currentRequest.to is NavigationRouteManager.Route.Back
             }
         }
     }

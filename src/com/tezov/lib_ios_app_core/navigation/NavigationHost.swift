@@ -27,18 +27,26 @@ public struct NavHost: View {
 
         let _ = {
 
-            print("******************")
             let _builder = NavHostCore.Graph.Builder(
                 providers: navController.navHostController.providers,
                 startDestination: startRoute.path
             )
             builder(_builder)
-            print("******************")
-
-            let graph = _builder.build()
+            navController.navHostController.graph = _builder.build()
             
-//            graph.moveTo(route: "cart")
-            graph.moveTo(route: "navAuth")
+            
+            navController.navHostController.navigate(route: "cart")
+            navController.navHostController.navigate(route: "check")
+//            navController.navHostController.popBackStack()
+            navController.navHostController.navigate(route: "menu")
+            navController.navHostController.navigate(route: "check")
+            navController.navHostController.navigate(route: "check")
+            navController.navHostController.navigate(route: "check")
+            navController.navHostController.navigate(route: "navLobby")
+            navController.navHostController.navigate(route: "navAuth")
+            navController.navHostController.navigate(route: "navLobby")
+
+            
             
             
             

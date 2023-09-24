@@ -83,10 +83,10 @@ open class _NavigationRouteManager_Route: Hashable, Identifiable {
     }
 
     public var path: String {
-        if let it = parameters {
+        if let parameters {
             var path = id
             path.append("/{\(NavigationRouteManager.Route.HAS_PARAMETER)}")
-            it.forEach { entry in
+            parameters.forEach { entry in
                 path.append("/{\(entry.key)}")
             }
             return path
@@ -97,10 +97,10 @@ open class _NavigationRouteManager_Route: Hashable, Identifiable {
     }
 
     public var query: String {
-        if let it = parameters {
+        if let parameters {
             var path = id
             path.append("/\(NavigationRouteManager.Route.HAS_PARAMETER)")
-            it.forEach { entry in
+            parameters.forEach { entry in
                 path.append("/\(entry.value ?? NavigationRouteManager.Route.PARAMETER_NULL)") // todo value?.toStringHex()
             }
             return path
@@ -119,9 +119,9 @@ open class _NavigationRouteManager_Route: Hashable, Identifiable {
             return self
         }
         let route = createCopy()
-        if let it = bundle {
+        if let bundle {
             parameters?.forEach { entry in
-                let bundleValue = (it[entry.key] as? String) // todo ?.toStringChar()
+                let bundleValue = (bundle[entry.key] as? String) // todo ?.toStringChar()
                 route.putParameter(name: entry.key, value: bundleValue ?? entry.value)
             }
         }

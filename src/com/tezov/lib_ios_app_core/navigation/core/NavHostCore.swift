@@ -39,20 +39,25 @@ public class _NavHostCore_Controller: ObservableObject {
     private var currentGraphNode: NavHostCore.Graph!
     var graph: NavHostCore.Graph? = nil {
         willSet {
-            if graph != nil {
-                fatalError("graph is already setted")
-            }
+            precondition(graph == nil, "graph is already setted")
+            precondition(newValue != nil, "graph can't be set to nil")
         }
         didSet {
-            currentGraphNode = graph
+            if let _graph = graph {
+                let (graph, destination) = _graph.resolveStartDestination()
+                currentGraphNode = graph
+                let entry = NavHostCore.BackStackEntry(destination: destination)
+                _backQueue.append(entry)
+                //visibleEntries.append(entry)
+            }
         }
     }
 
     private var _backQueue: [NavHostCore.BackStackEntry]
     private(set) var providers: [TypeIdentity: any NavHostCore.Navigator]
 
-    var currentBackStack: [NavHostCore.BackStackEntry] = []
-    var visibleEntries: [NavHostCore.BackStackEntry] = []
+    var currentBackStack: [NavHostCore.BackStackEntry] { _backQueue }
+    private(set) var visibleEntries: [NavHostCore.BackStackEntry] = []
 
     public init(providers: [TypeIdentity: any NavHostCore.Navigator] = [:]) {
         self._backQueue = []
@@ -74,44 +79,23 @@ public class _NavHostCore_Controller: ObservableObject {
     }
 
     func navigate(route: String, option _: NavHostCore.Option? = nil) {
-        
-        //todo nav at the same route ?
-        //todo add to queue
-        
-        guard let _graph = graph else { fatalError("graph is nil, you forgot to set it inside NavHost View") }
-        guard let (newNode, destination) = currentGraphNode.moveTo(route: route)
+        // todo option
+
+        guard let graph else { fatalError("graph is nil, you forgot to set it inside NavHost View") }
+        guard let (newNode, destination) = currentGraphNode.resolve(route: route)
         else { fatalError("invalid navigate request from \(currentBackStackEntry?.destination.route ?? "root") to \(route)") }
+        currentGraphNode = newNode
+        let entry = NavHostCore.BackStackEntry(destination: destination)
+        _backQueue.append(entry)
+        //visibleEntries.append(entry)
+        
+        print("\(destination.route ?? "nil") \(_backQueue.count)")
 
-        //        var destination:NavHostCore.Destination? = nil
-        //        if let _option = option {
-        //            if _option.clearStack.isTrue  {
-        //                _backQueue.forEach { entry in
-        //
-        //
-        //                    providers.first { (_, navigator) in
-        //                        navigator.name == entry.destination.navigatorName
-        //                    }?.value.navigate(entries: <#T##[NavHostCore.BackStackEntry]#>, navOptions: T##NavigationController.Option)
-        //
-        //
-        //
-        //                }
-        //            }
-        //            if let singleTop = _option.singleTop {
-        //
-        //            }
-        //
-        //
-        //
-        //
-        //        }
-
-        // let destination = NavHostCore.Destination(navigatorName: "", route: route) // graph.findDestination()
-        // let entry = NavHostCore.BackStackEntry(destination: destination)
-        // _backQueue.append(entry)
     }
 
     func popBackStack() {
         _backQueue.removeLast()
+        
     }
 }
 
@@ -119,26 +103,22 @@ public class _NavHostCore_Graph {
     private var parent: NavHostCore.Graph?
     private var childs: [NavHostCore.Graph]
     private var route: String?
-    private var startDestination: String?
+    private var startDestination: String
     private var destinations: [NavHostCore.Destination]
 
     init(
         parent: NavHostCore.Graph? = nil,
         route: String? = nil,
-        startDestination: String? = nil
+        startDestination: String
     ) {
         self.parent = parent
         self.childs = []
         self.route = route
         self.startDestination = startDestination
         self.destinations = []
-        
-        print("navgraph \(route ?? "ROOT") \(startDestination ?? "")")
     }
 
     func append(destination: NavHostCore.Destination) {
-        print("destination \(destination.route ?? "")")
-        
         destinations.append(destination)
     }
 
@@ -146,74 +126,55 @@ public class _NavHostCore_Graph {
         childs.append(child)
     }
 
-    func moveTo(route: String) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
-        
-        print("moveTo \(route) from \(self.route ?? "ROOT") \(self.startDestination ?? "nil")")
-        
+    fileprivate func resolveStartDestination() -> (node: NavHostCore.Graph, destination: NavHostCore.Destination) {
+        return resolve(route: startDestination) ?? {
+            fatalError("start destination not found \(startDestination)")
+        }()
+    }
+
+    private func firstDestination(route: String, graph: NavHostCore.Graph) -> NavHostCore.Destination? {
+        graph.destinations.first { $0.route == route }
+    }
+    
+    private func firstGraph(route: String, graph: NavHostCore.Graph) -> NavHostCore.Graph? {
+        graph.childs.first { $0.route == route || $0.startDestination == route }
+    }
+    
+    func resolve(route: String) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
         var result = resolve(route: route, graph: self)
-        if(result == nil){
+        if result == nil {
             result = resolveAscending(route: route, graph: self)
         }
         return result
     }
-    
-    private func resolve(route: String, graph:NavHostCore.Graph) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
-        print("resolve")
-        
-        var outNode:NavHostCore.Graph = graph
-        var outDestination:NavHostCore.Destination? = nil
-        //look in sibling destination
-        print("look in sibling destination")
-        for destination in destinations {
-            print("**\(destination.route ?? "nil")")
-            if(destination.route == route){
-                outDestination = destination
-                break
+
+    private func resolve(route: String, graph: NavHostCore.Graph) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
+        var outGraph = graph
+        var outDestination = firstDestination(route: route, graph: outGraph)
+        if outDestination == nil {
+            if let graph = firstGraph(route: route, graph: outGraph), let _outDestination = firstDestination(route: graph.startDestination, graph: graph) {
+                outDestination = _outDestination
+                outGraph = graph
             }
         }
-        //look in sibling graph
-        print("look in sibling graph")
-        if(outDestination == nil){
-            for graph in childs {
-                print("graph \(graph.route ?? "nil") \(graph.startDestination ?? "nil")")
-                if(graph.route == route){
-                    outDestination = graph.destinations.first { destination in
-                        print("**\(destination.route ?? "nil")")
-                        return destination.route == graph.startDestination
-                    }
-                    if(outDestination != nil){
-                        outNode = graph
-                    }
-                    break
-                }
-            }
-        }
-        //return
-        if let _outDestination = outDestination {
-            print("resolve result \(outNode.route ?? "nil") \(_outDestination.route ?? "nil")")
-            return (outNode, _outDestination)
+        if let outDestination {
+            return (outGraph, outDestination)
         }
         else {
-            print("resolve result nil")
             return nil
         }
     }
-        
-    private func resolveAscending(route: String, graph:NavHostCore.Graph) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
-        print("resolveAscending")
-        
+
+    private func resolveAscending(route: String, graph: NavHostCore.Graph) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
         var parent = graph.parent
-        while(parent != nil){
-            if let result = resolve(route: route, graph:parent!){
-                print("resolveAscending result done")
+        while parent != nil {
+            if let result = resolve(route: route, graph: parent!) {
                 return result
             }
             parent = parent!.parent
         }
-        print("resolveAscending result nil")
         return nil
     }
-    
 }
 
 public class _NavHostCore_Graph_Builder {
@@ -225,7 +186,7 @@ public class _NavHostCore_Graph_Builder {
         providers: [TypeIdentity: any NavHostCore.Navigator],
         parent: NavHostCore.Graph? = nil,
         route: String? = nil,
-        startDestination: String? = nil
+        startDestination: String
     ) {
         self.providers = providers
         self.navGraph = NavHostCore.Graph(
