@@ -1,4 +1,4 @@
-import lib_ios_core
+import lib_ios_ui_core
 import SwiftUI
 import UIKit
 
@@ -31,7 +31,7 @@ public struct BottomNavigationInternal: UIViewRepresentable {
     @Binding var selected: Int
     let onClick: (NavigationRouteManager.Route) -> Void // todo remove this and propagate the click through action same as kotlin
 
-    @State @Lazy private var tabControllerState = TabBarController()
+    @Remember private var tabControllerState = TabBarController()
 
     internal init(items: [BottomNavigationItem], selected: Binding<Int>, onClick: @escaping (NavigationRouteManager.Route) -> Void) {
         self.items = items

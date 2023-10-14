@@ -1,9 +1,10 @@
 import lib_ios_core
+import lib_ios_ui_core
 import SwiftUI
 
 public struct NavHost: View {
     @State @Lazy private var state = NavHostState()
-    
+
     public init(
         navController: NavigationController.Core,
         route: NavigationRouteManager.Route? = nil,
@@ -19,21 +20,21 @@ public struct NavHost: View {
             builder: builder
         )
     }
-    
+
     public var body: some View {
         state.remember()
     }
 }
 
 private class NavHostState {
-    private var value: NavHostImpl? = nil
-    
+    private var value: NavHostImpl?
+
     var navController: NavigationController.Core!
     var route: NavigationRouteManager.Route?
     var startRoute: NavigationRouteManager.Route!
     var animationConfig: NavigationAnimation.Config!
     var builder: ((NavHostCore.Graph.Builder) -> Void)!
-    
+
     func update(
         navController: NavigationController.Core,
         route: NavigationRouteManager.Route? = nil,
@@ -49,7 +50,7 @@ private class NavHostState {
             self.builder = builder
         }
     }
-    
+
     func remember() -> NavHostImpl {
         return value ?? {
             let graphBuilder = NavHostCore.Graph.Builder(
@@ -65,40 +66,42 @@ private class NavHostState {
             return value!
         }()
     }
-    
 }
 
 public struct NavHostImpl: View {
     private let navController: NavigationController.Core
     private let animationConfig: NavigationAnimation.Config
-    
+
     init(navController: NavigationController.Core, animationConfig: NavigationAnimation.Config) {
         self.navController = navController
         self.animationConfig = animationConfig
     }
-    
+
     private var entries: [NavHostCore.BackStackEntry] = []
     private var lastEntryId: String?
-    
+
     var isNavigatingBack: Bool { navController.isNavigatingBack }
-    
+
     func isLastEntry(entry: NavHostCore.BackStackEntry) -> Bool { entry.id == lastEntryId }
-    
+
     private var indexOfLastEntry: Int? { entries.lastIndex { $0.id == lastEntryId } }
-    
+
     var lastEntry: NavHostCore.BackStackEntry? { entries.last { $0.id == lastEntryId } }
-    
+
+    @State var a = 0
+    @Remember var b = 0
+
     public var body: some View {
-        Text("Hello World ").onTapGesture {
-            
-            
+        VStack {
+            Text("Hello World \(a) \(b)").onTapGesture {
+                if b % 2 == 1 {
+                    a = a + 1
+                }
+                b = b + 1
+            }
         }
     }
-    
-
-    
 }
-
 
 internal class _NavHost {
     private let navController: NavigationController.Core
