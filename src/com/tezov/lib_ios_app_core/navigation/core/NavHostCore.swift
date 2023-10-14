@@ -180,12 +180,10 @@ public class _NavHostCore_Graph {
     }
 
     private func resolveAscending(route: String, graph: NavHostCore.Graph) -> (node: NavHostCore.Graph, destination: NavHostCore.Destination)? {
-        var parent = graph.parent
-        while parent != nil {
-            if let result = resolve(route: route, graph: parent!) {
+        while let parent = graph.parent {
+            if let result = resolve(route: route, graph: parent) {
                 return result
             }
-            parent = parent!.parent
         }
         return nil
     }
