@@ -35,7 +35,7 @@ public protocol _NavHostCore_Navigator {
     )
 }
 
-public class _NavHostCore_Controller: ObservableObject {
+public class _NavHostCore_Controller {
     private var currentGraphNode: NavHostCore.Graph!
     var graph: NavHostCore.Graph? = nil {
         willSet {
@@ -105,7 +105,6 @@ public class _NavHostCore_Controller: ObservableObject {
         let entry = NavHostCore.BackStackEntry(destination: destination)
         
         _backQueue.append(entry)
-        objectWillChange.send()
     }
 
     func popBackStack() {

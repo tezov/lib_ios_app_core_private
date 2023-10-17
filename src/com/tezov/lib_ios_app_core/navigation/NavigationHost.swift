@@ -2,8 +2,37 @@ import lib_ios_core
 import lib_ios_ui_core
 import SwiftUI
 
+public protocol StateFlowFlusher {
+    func flush()
+}
+
+@propertyWrapper public struct StateFlow<T: StateFlowFlusher>: DynamicProperty {
+    @State @Lazy private var value: T
+
+    public var wrappedValue: T {
+        get {
+            return value
+        }
+        nonmutating set {
+            value = newValue
+        }
+    }
+
+    public init(wrappedValue: @escaping @autoclosure () -> T) {
+        self._value = State(wrappedValue: Lazy(wrappedValue()))
+    }
+
+    public init(_ value: @escaping @autoclosure () -> T) {
+        self._value = State(wrappedValue: Lazy(value()))
+    }
+    
+    public func flush() {
+        
+    }
+}
+
 public struct NavHost: View {
-    @State @Lazy private var state = NavHostState()
+    @StateFlow private var state = NavHostState()
 
     public init(
         navController: NavigationController.Core,
@@ -26,7 +55,7 @@ public struct NavHost: View {
     }
 }
 
-private class NavHostState {
+private class NavHostState: StateFlowFlusher {
     private var value: NavHostImpl?
 
     var navController: NavigationController.Core!
@@ -42,7 +71,7 @@ private class NavHostState {
         animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
         builder: @escaping (NavHostCore.Graph.Builder) -> Void
     ) {
-        if value == nil {
+        if self.value == nil {
             self.navController = navController
             self.route = route
             self.startRoute = startRoute
@@ -60,19 +89,28 @@ private class NavHostState {
             builder(graphBuilder)
             navController.navHostController.graph = graphBuilder.build()
             value = NavHostImpl(
+                stateFlusher: self,
                 navController: navController,
                 animationConfig: animationConfig
             )
             return value!
         }()
     }
+
+    func flush() { 
+        
+        
+        
+    }
 }
 
 public struct NavHostImpl: View {
+    private let stateFlusher: StateFlowFlusher
     private let navController: NavigationController.Core
     private let animationConfig: NavigationAnimation.Config
 
-    init(navController: NavigationController.Core, animationConfig: NavigationAnimation.Config) {
+    init(stateFlusher: StateFlowFlusher, navController: NavigationController.Core, animationConfig: NavigationAnimation.Config) {
+        self.stateFlusher = stateFlusher
         self.navController = navController
         self.animationConfig = animationConfig
     }
@@ -88,16 +126,11 @@ public struct NavHostImpl: View {
 
     var lastEntry: NavHostCore.BackStackEntry? { entries.last { $0.id == lastEntryId } }
 
-    @State var a = 0
-    @Remember var b = 0
-
     public var body: some View {
         VStack {
-            Text("Hello World \(a) \(b)").onTapGesture {
-                if b % 2 == 1 {
-                    a = a + 1
-                }
-                b = b + 1
+            Text("Hello World").onTapGesture {
+                print("flush")
+                stateFlusher.flush()
             }
         }
     }
