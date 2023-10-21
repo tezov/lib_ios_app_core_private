@@ -52,11 +52,13 @@ public class _NavHostCore_Controller {
         }
     }
 
-    private var _backQueue: [NavHostCore.BackStackEntry]
+    private var _backQueue: [NavHostCore.BackStackEntry] {
+        didSet { currentBackStack = _backQueue }
+    }
     private(set) var providers: [TypeIdentity: any NavHostCore.Navigator]
-
-    var currentBackStack: [NavHostCore.BackStackEntry] { _backQueue }
-    private(set) var visibleEntries: [NavHostCore.BackStackEntry] = []
+    
+    @Published private(set) var currentBackStack: [NavHostCore.BackStackEntry] = []
+    @Published private(set) var visibleEntries: [NavHostCore.BackStackEntry] = []
 
     public init(providers: [TypeIdentity: any NavHostCore.Navigator] = [:]) {
         self._backQueue = []
@@ -64,9 +66,7 @@ public class _NavHostCore_Controller {
             TypeIdentity(ComposableTransientNavigator.Core.self): ComposableTransientNavigator.Core(),
             TypeIdentity(ComposableOverlayNavigator.Core.self): ComposableOverlayNavigator.Core(),
         ]
-        providers.forEach { key, value in
-            _providers[key] = value
-        }
+        providers.forEach { _providers[$0] = $1 }
         self.providers = _providers
     }
 
@@ -103,7 +103,6 @@ public class _NavHostCore_Controller {
         }
         currentGraphNode = newNode
         let entry = NavHostCore.BackStackEntry(destination: destination)
-        
         _backQueue.append(entry)
     }
 

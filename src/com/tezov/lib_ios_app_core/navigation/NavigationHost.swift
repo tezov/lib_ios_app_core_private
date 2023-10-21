@@ -1,118 +1,99 @@
+import Combine
 import lib_ios_core
 import lib_ios_ui_core
 import SwiftUI
 
-public protocol StateFlowFlusher {
-    func flush()
+@propertyWrapper public class Mutable<T: Any> {
+    private var value: T
+    public var wrappedValue: T {
+        get { value }
+        set { value = newValue }
+    }
+
+    public init(wrappedValue: T) {
+        value = wrappedValue
+    }
 }
 
-@propertyWrapper public struct StateFlow<T: StateFlowFlusher>: DynamicProperty {
-    @State @Lazy private var value: T
-
+@propertyWrapper public struct RememberState<T: ObservableObject>: DynamicProperty {
+    @State var state: Int = 0
+    @Mutable private var cancellable: AnyCancellable? = .none
+    @Mutable private var initializer: (() -> T)?
+    @Mutable private var value: T? = .none
     public var wrappedValue: T {
-        get {
+        return value ?? {
+            guard let initializer else { fatalError("RememberState initializer is nil") }
+            let value = initializer()
+            self.initializer = .none
+            cancellable = value.objectWillChange.sink(
+                receiveValue: { [$state] _ in $state.wrappedValue += 1 }
+            )
+            self.value = value
             return value
-        }
-        nonmutating set {
-            value = newValue
-        }
+        }()
     }
 
     public init(wrappedValue: @escaping @autoclosure () -> T) {
-        self._value = State(wrappedValue: Lazy(wrappedValue()))
+        self.initializer = wrappedValue
     }
 
-    public init(_ value: @escaping @autoclosure () -> T) {
-        self._value = State(wrappedValue: Lazy(value()))
-    }
-    
-    public func flush() {
-        
+    public init(_ initializer: @escaping () -> T) {
+        self.initializer = initializer
     }
 }
 
+private struct _NavigationController_Friend_Object: NavigationController.Friend { }
+
 public struct NavHost: View {
-    @StateFlow private var state = NavHostState()
+    @RememberState private var state: NavHostState
 
     public init(
         navController: NavigationController.Core,
-        route: NavigationRouteManager.Route? = nil,
+        route _: NavigationRouteManager.Route? = nil,
         startRoute: NavigationRouteManager.Route,
         animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
         builder: @escaping (NavHostCore.Graph.Builder) -> Void
     ) {
-        state.update(
-            navController: navController,
-            route: route,
-            startRoute: startRoute,
-            animationConfig: animationConfig,
-            builder: builder
-        )
-    }
-
-    public var body: some View {
-        state.remember()
-    }
-}
-
-private class NavHostState: StateFlowFlusher {
-    private var value: NavHostImpl?
-
-    var navController: NavigationController.Core!
-    var route: NavigationRouteManager.Route?
-    var startRoute: NavigationRouteManager.Route!
-    var animationConfig: NavigationAnimation.Config!
-    var builder: ((NavHostCore.Graph.Builder) -> Void)!
-
-    func update(
-        navController: NavigationController.Core,
-        route: NavigationRouteManager.Route? = nil,
-        startRoute: NavigationRouteManager.Route,
-        animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
-        builder: @escaping (NavHostCore.Graph.Builder) -> Void
-    ) {
-        if self.value == nil {
-            self.navController = navController
-            self.route = route
-            self.startRoute = startRoute
-            self.animationConfig = animationConfig
-            self.builder = builder
-        }
-    }
-
-    func remember() -> NavHostImpl {
-        return value ?? {
+        self._state = RememberState {
             let graphBuilder = NavHostCore.Graph.Builder(
                 providers: navController.navHostController.providers,
                 startDestination: startRoute.path
             )
             builder(graphBuilder)
             navController.navHostController.graph = graphBuilder.build()
-            value = NavHostImpl(
-                stateFlusher: self,
+            return NavHostState(
                 navController: navController,
                 animationConfig: animationConfig
             )
-            return value!
-        }()
+        }
     }
 
-    func flush() { 
-        
-        
-        
+    public var body: some View {
+        let _ = _state.state
+        state.body
     }
 }
 
-public struct NavHostImpl: View {
-    private let stateFlusher: StateFlowFlusher
-    private let navController: NavigationController.Core
-    private let animationConfig: NavigationAnimation.Config
+private class NavHostState: ObservableObject {
+    var navController: NavigationController.Core
+    var animationConfig: NavigationAnimation.Config
+    var ref: AnyCancellable? = nil
 
-    init(stateFlusher: StateFlowFlusher, navController: NavigationController.Core, animationConfig: NavigationAnimation.Config) {
-        self.stateFlusher = stateFlusher
+    public init(
+        navController: NavigationController.Core,
+        animationConfig: NavigationAnimation.Config = NavigationAnimation.Config()
+    ) {
         self.navController = navController
         self.animationConfig = animationConfig
+        ref = navController.navHostController.$currentBackStack.sink(
+            receiveValue: { [weak self] values in
+                guard let self else { return }
+                values.forEach { entry in
+                    print("\(entry.id):\(entry.destination.route ?? "not route")")
+                }
+                self.objectWillChange.send()
+            }
+        )
     }
 
     private var entries: [NavHostCore.BackStackEntry] = []
@@ -126,12 +107,29 @@ public struct NavHostImpl: View {
 
     var lastEntry: NavHostCore.BackStackEntry? { entries.last { $0.id == lastEntryId } }
 
+    @ViewBuilder
     public var body: some View {
+        let _ = print("**** bottom")
         VStack {
-            Text("Hello World").onTapGesture {
-                print("flush")
-                stateFlusher.flush()
-            }
+            Text("Hello World \(navController.navHostController.currentBackStack.count)")
+                .onTapGesture { [unowned self] in
+                    if let currentRoute = navController.currentRoute() {
+                        print("current route: \(currentRoute.path)")
+                        
+                        navController.navigate(
+                            friend: _NavigationController_Friend_Object(),
+                            request: NavigationController.Request(
+                                from: currentRoute,
+                                to: currentRoute,
+                                askedBy: nil,
+                                option: nil
+                            )
+                        )
+                        
+                    }
+                    
+                    
+                }
         }
     }
 }
