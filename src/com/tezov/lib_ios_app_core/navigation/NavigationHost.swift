@@ -3,49 +3,11 @@ import lib_ios_core
 import lib_ios_ui_core
 import SwiftUI
 
-@propertyWrapper public class Mutable<T: Any> {
-    private var value: T
-    public var wrappedValue: T {
-        get { value }
-        set { value = newValue }
-    }
-
-    public init(wrappedValue: T) {
-        value = wrappedValue
-    }
-}
-
-@propertyWrapper public struct RememberState<T: ObservableObject>: DynamicProperty {
-    @State var state: Int = 0
-    @Mutable private var cancellable: AnyCancellable? = .none
-    @Mutable private var initializer: (() -> T)?
-    @Mutable private var value: T? = .none
-    public var wrappedValue: T {
-        return value ?? {
-            guard let initializer else { fatalError("RememberState initializer is nil") }
-            let value = initializer()
-            self.initializer = .none
-            cancellable = value.objectWillChange.sink(
-                receiveValue: { [$state] _ in $state.wrappedValue += 1 }
-            )
-            self.value = value
-            return value
-        }()
-    }
-
-    public init(wrappedValue: @escaping @autoclosure () -> T) {
-        self.initializer = wrappedValue
-    }
-
-    public init(_ initializer: @escaping () -> T) {
-        self.initializer = initializer
-    }
-}
 
 private struct _NavigationController_Friend_Object: NavigationController.Friend { }
 
 public struct NavHost: View {
-    @RememberState private var state: NavHostState
+    @StateFlow private var state: NavHostState
 
     public init(
         navController: NavigationController.Core,
@@ -54,7 +16,7 @@ public struct NavHost: View {
         animationConfig: NavigationAnimation.Config = NavigationAnimation.Config(),
         builder: @escaping (NavHostCore.Graph.Builder) -> Void
     ) {
-        self._state = RememberState {
+        self._state = StateFlow {
             let graphBuilder = NavHostCore.Graph.Builder(
                 providers: navController.navHostController.providers,
                 startDestination: startRoute.path
@@ -68,16 +30,12 @@ public struct NavHost: View {
         }
     }
 
-    public var body: some View {
-        let _ = _state.state
-        state.body
-    }
+    public var body: some View { state.body }
 }
 
-private class NavHostState: ObservableObject {
+private class NavHostState: ObservableFlow {
     var navController: NavigationController.Core
     var animationConfig: NavigationAnimation.Config
-    var ref: AnyCancellable? = nil
 
     public init(
         navController: NavigationController.Core,
@@ -85,15 +43,8 @@ private class NavHostState: ObservableObject {
     ) {
         self.navController = navController
         self.animationConfig = animationConfig
-        ref = navController.navHostController.$currentBackStack.sink(
-            receiveValue: { [weak self] values in
-                guard let self else { return }
-                values.forEach { entry in
-                    print("\(entry.id):\(entry.destination.route ?? "not route")")
-                }
-                self.objectWillChange.send()
-            }
-        )
+        super.init()
+        publish(navController.navHostController.$currentBackStack)
     }
 
     private var entries: [NavHostCore.BackStackEntry] = []
@@ -109,13 +60,10 @@ private class NavHostState: ObservableObject {
 
     @ViewBuilder
     public var body: some View {
-        let _ = print("**** bottom")
         VStack {
             Text("Hello World \(navController.navHostController.currentBackStack.count)")
                 .onTapGesture { [unowned self] in
                     if let currentRoute = navController.currentRoute() {
-                        print("current route: \(currentRoute.path)")
-                        
                         navController.navigate(
                             friend: _NavigationController_Friend_Object(),
                             request: NavigationController.Request(
@@ -125,13 +73,15 @@ private class NavHostState: ObservableObject {
                                 option: nil
                             )
                         )
+                        navController.unlockNavigate()
                         
                     }
-                    
-                    
                 }
         }
     }
+    
+    
+    
 }
 
 internal class _NavHost {

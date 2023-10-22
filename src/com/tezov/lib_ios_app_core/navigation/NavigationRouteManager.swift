@@ -79,7 +79,7 @@ open class _NavigationRouteManager_Route: Hashable, Identifiable {
     }
 
     public func getParameter(name: String) -> String? {
-        return parameters?.getValue(name).flatten() as? String
+        return parameters?.getValue(name).flatten as? String
     }
 
     public var path: String {

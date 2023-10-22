@@ -119,8 +119,8 @@ open class _NavigationController {
     }
 
     private func lockNavigate(_ request: NavigationController.Request) -> Bool {
-        if currentRequest != nil {
-            requestFeedback(request: request, exception: Exception(message: "Navigation is busy"))
+        if currentRequest.isNotNil {
+            requestFeedback(request: request, exception: Exception(message: "lockNavigate: Navigation is already busy"))
             return false
         }
         currentRequest = request
@@ -128,20 +128,21 @@ open class _NavigationController {
     }
 
     internal func unlockNavigate() {
-        if let it = currentRequest {
-            requestFeedback(request: it, exception: nil)
-            currentRequest = nil
+        if currentRequest.isNil {
+            requestFeedback(request: nil, exception: Exception(message: "unlockNavigate:Navigation is not busy"))
+            return
         }
+        currentRequest = nil
     }
 
-    private func requestFeedback(request: NavigationController.Request, exception: Exception?) {
+    private func requestFeedback(request: NavigationController.Request?, exception: Exception?) {
         let failedRequest = NavigationController.Request(
-            from: request.from,
+            from: request?.from ?? currentRoute(),
             to: NavigationRouteManager.Route.RequestFeedback(
-                target: request.to,
+                target: request?.to,
                 exception: exception
             ),
-            askedBy: request.askedBy
+            askedBy: request?.askedBy
         )
         requestHandlers.getValue(NavigationRouteManager.Route.RequestFeedback.klass())?(failedRequest)
     }
