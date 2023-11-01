@@ -104,4 +104,22 @@ open class _ComposableNavigator_Content: NavHostCore.Destination {
         self.content = content
         super.init(navigatorName: navigatorName, route: route)
     }
+    
+    var requestComplete: Bool = false
+    var isVisible: Bool = false
+    
+    var backgroundId: String? = nil
+    var foregroundId: String? = nil
+    
+}
+
+
+extension NavHostCore.BackStackEntry {
+    
+    var content:ComposableNavigator.Content {
+        self.destination as? ComposableNavigator.Content ?? {
+           fatalError("destination is not a content")
+        }()
+    }
+    
 }
