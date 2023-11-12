@@ -35,34 +35,30 @@ open class _ComposableNavigator_GraphEntry {
     init(entry _: NavHostCore.BackStackEntry) { }
 }
 
-public protocol _ComposableNavigator_Protocol: NavHostCore.Navigator where Destination: ComposableNavigator.Content {
+internal protocol _ComposableNavigator_Protocol: NavHostCore.Navigator.Interface where Destination: ComposableNavigator.Content {
     func composePrepare(
-        navHost: NavHost,
+        navHost: NavHostState,
         entry: NavHostCore.BackStackEntry
     )
 
     func updateCompletion(
-        navHost: NavHost,
+        navHost: NavHostState,
         entry: NavHostCore.BackStackEntry
     )
 
     func createGraphEntry(entry: NavHostCore.BackStackEntry) -> ComposableNavigator.GraphEntry
+        
 }
 
-open class _ComposableNavigator: ComposableNavigator.Interface {
-    public typealias Destination = ComposableNavigator.Content
-
-    public var name: String {
-        fatalError("ComposableNavigator.Core can't be instatiated or you forgot to override name in subclass")
-    }
+open class _ComposableNavigator<D:ComposableNavigator.Content>: NavHostCore.Navigator.Core<D>, ComposableNavigator.Interface {
 
     open func composePrepare(
-        navHost _: NavHost,
+        navHost _: NavHostState,
         entry _: NavHostCore.BackStackEntry
     ) { }
 
     open func updateCompletion(
-        navHost _: NavHost,
+        navHost _: NavHostState,
         entry _: NavHostCore.BackStackEntry
     ) { }
 
@@ -71,7 +67,7 @@ open class _ComposableNavigator: ComposableNavigator.Interface {
     ) { }
 
     public func compose(
-        navHost _: NavHost,
+        navHost _: NavHostState,
         entry _: NavHostCore.BackStackEntry
     ) { }
 
@@ -79,12 +75,17 @@ open class _ComposableNavigator: ComposableNavigator.Interface {
         return ComposableNavigator.GraphEntry(entry: entry)
     }
 
-    public func navigate(entries _: [NavHostCore.BackStackEntry], navOptions _: NavHostCore.Option) { }
+    public override func navigate(entries: [NavHostCore.BackStackEntry], option: NavHostCore.Option?) {
+        entries.forEach { state.pushWithTransitions($0) }
+    }
 
-    public func popBackStack(
-        popUpTo _: NavHostCore.BackStackEntry,
-        savedState _: Bool
-    ) { }
+    public override func popBackStack(
+        popUpTo : NavHostCore.BackStackEntry,
+        savedState : Bool
+    ) { 
+        popUpTo.content.clear()
+        state.popWithTransition(popUpTo, savedState)
+    }
 }
 
 open class _ComposableNavigator_Content: NavHostCore.Destination {
@@ -111,6 +112,11 @@ open class _ComposableNavigator_Content: NavHostCore.Destination {
     var backgroundId: String? = nil
     var foregroundId: String? = nil
     
+    open func clear() {
+        requestComplete = false
+        isVisible = false
+    }
+    
 }
 
 
@@ -120,6 +126,13 @@ extension NavHostCore.BackStackEntry {
         self.destination as? ComposableNavigator.Content ?? {
            fatalError("destination is not a content")
         }()
+    }
+    
+    var navigator:any ComposableNavigator.Interface {
+        self.content.navigator
+//        ?? {
+//            fatalError("navigator can't be null")
+//        }()
     }
     
 }

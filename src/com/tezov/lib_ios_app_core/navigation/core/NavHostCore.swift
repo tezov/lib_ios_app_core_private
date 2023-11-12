@@ -5,12 +5,18 @@ import SwiftUI
 // MARK: -
 
 public enum NavHostCore {
-    public typealias Navigator = _NavHostCore_Navigator
+    public typealias Navigator = _NavHostCore_NavHostCore
     public typealias Controller = _NavHostCore_Controller
     public typealias Graph = _NavHostCore_Graph
     public typealias Destination = _NavHostCore_Destination
     public typealias BackStackEntry = _NavHostCore_BackStackEntry
     public typealias Option = _NavHostCore_Option
+}
+
+public enum _NavHostCore_NavHostCore {
+    public typealias Interface = _NavHostCore_Navigator_Protocol
+    public typealias Core = _NavHostCore_Navigator_Core
+    public typealias State = _NavHostCore_Navigator_State
 }
 
 public extension NavHostCore.Graph {
@@ -19,14 +25,16 @@ public extension NavHostCore.Graph {
 
 // MARK: -
 
-public protocol _NavHostCore_Navigator {
+public protocol _NavHostCore_Navigator_Protocol {
     associatedtype Destination: NavHostCore.Destination
 
     var name: String { get }
 
+    var state: NavHostCore.Navigator.State { get }
+    
     func navigate(
         entries: [NavHostCore.BackStackEntry],
-        navOptions: NavHostCore.Option
+        option: NavHostCore.Option?
     )
 
     func popBackStack(
@@ -34,6 +42,47 @@ public protocol _NavHostCore_Navigator {
         savedState: Bool
     )
 }
+
+open class _NavHostCore_Navigator_Core<D:NavHostCore.Destination>: NavHostCore.Navigator.Interface {
+    public typealias Destination = D
+    
+    public var state: NavHostCore.Navigator.State
+    
+    init(_ navigatorController: NavHostCore.Controller){
+        state = NavHostCore.Navigator.State(navigatorController: navigatorController)
+    }
+    
+    public var name: String {
+        fatalError("you need to subclass NavHostCore.Navigator.Core")
+    }
+
+    public func navigate(entries: [NavHostCore.BackStackEntry], option: NavHostCore.Option?) {
+        fatalError("you need to subclass NavHostCore.Navigator.Core")
+    }
+
+    public func popBackStack(popUpTo: NavHostCore.BackStackEntry, savedState: Bool) {
+        fatalError("you need to subclass NavHostCore.Navigator.Core")
+    }
+
+}
+
+public class _NavHostCore_Navigator_State {
+    let navigatorController: NavHostCore.Controller
+    
+    init(navigatorController: NavHostCore.Controller){
+        self.navigatorController = navigatorController
+    }
+    
+    func pushWithTransitions(_ entry: NavHostCore.BackStackEntry){
+        navigatorController.pushWithTransitions(entry)
+    }
+    
+    func popWithTransition(_ entry: NavHostCore.BackStackEntry, _ saveState:Bool){
+        navigatorController.popWithTransition(entry, saveState)
+    }
+    
+}
+
 
 public class _NavHostCore_Controller {
     private var currentGraphNode: NavHostCore.Graph!
@@ -48,6 +97,7 @@ public class _NavHostCore_Controller {
                 currentGraphNode = graph
                 let entry = NavHostCore.BackStackEntry(destination: destination)
                 _backQueue.append(entry)
+                informNavigate(entry: entry, option: nil)
             }
         }
     }
@@ -55,19 +105,19 @@ public class _NavHostCore_Controller {
     private var _backQueue: [NavHostCore.BackStackEntry] {
         didSet { currentBackStack = _backQueue }
     }
-    private(set) var providers: [TypeIdentity: any NavHostCore.Navigator]
+    private(set) var providers: [TypeIdentity: any NavHostCore.Navigator.Interface]
     
     @Published private(set) var currentBackStack: [NavHostCore.BackStackEntry] = []
     @Published private(set) var visibleEntries: [NavHostCore.BackStackEntry] = []
 
-    public init(providers: [TypeIdentity: any NavHostCore.Navigator] = [:]) {
+    public init(providers: [TypeIdentity: any NavHostCore.Navigator.Interface] = [:]) {
         self._backQueue = []
-        var _providers: [TypeIdentity: any NavHostCore.Navigator] = [
-            TypeIdentity(ComposableTransientNavigator.Core.self): ComposableTransientNavigator.Core(),
-            TypeIdentity(ComposableOverlayNavigator.Core.self): ComposableOverlayNavigator.Core(),
-        ]
-        providers.forEach { _providers[$0] = $1 }
-        self.providers = _providers
+        self.providers = [:]
+        self.providers[TypeIdentity(ComposableTransientNavigator.Core.self)]
+            =  ComposableTransientNavigator.Core(self)
+        self.providers[TypeIdentity(ComposableOverlayNavigator.Core.self)]
+            =  ComposableOverlayNavigator.Core(self)
+        providers.forEach { self.providers[$0] = $1 }
     }
 
     var currentBackStackEntry: NavHostCore.BackStackEntry? { _backQueue.last }
@@ -104,10 +154,28 @@ public class _NavHostCore_Controller {
         currentGraphNode = newNode
         let entry = NavHostCore.BackStackEntry(destination: destination)
         _backQueue.append(entry)
+        informNavigate(entry: entry, option: option)
+    }
+    
+    private func informNavigate(entry:NavHostCore.BackStackEntry, option:NavHostCore.Option?){
+        if let navigator = (providers.first { key, value in
+            value.name == entry.destination.navigatorName
+        }?.value) { navigator.navigate(entries: [entry], option: option) }
     }
 
     func popBackStack() {
         _backQueue.removeLast()
+    }
+    
+    fileprivate func pushWithTransitions(_ entry: NavHostCore.BackStackEntry){
+        visibleEntries.append(entry)
+        
+    }
+    
+    fileprivate func popWithTransition(_ entry: NavHostCore.BackStackEntry, _ saveState:Bool){
+        
+        
+        
     }
 }
 
@@ -190,10 +258,10 @@ public class _NavHostCore_Graph {
 public class _NavHostCore_Graph_Builder {
     private let navGraph: NavHostCore.Graph
     private var childs: [NavHostCore.Graph.Builder]
-    private let providers: [TypeIdentity: any NavHostCore.Navigator]
+    private let providers: [TypeIdentity: any NavHostCore.Navigator.Interface]
 
     init(
-        providers: [TypeIdentity: any NavHostCore.Navigator],
+        providers: [TypeIdentity: any NavHostCore.Navigator.Interface],
         parent: NavHostCore.Graph? = nil,
         route: String? = nil,
         startDestination: String
@@ -211,7 +279,7 @@ public class _NavHostCore_Graph_Builder {
         navGraph.append(destination: destination)
     }
 
-    func getProvider<N: NavHostCore.Navigator>(of identity: N.Type) -> N {
+    func getProvider<N: NavHostCore.Navigator.Interface>(of identity: N.Type) -> N {
         return providers[TypeIdentity(identity)] as? N ?? {
             fatalError("navigator \(identity) not provided to NavHostController")
         }()
@@ -250,7 +318,7 @@ open class _NavHostCore_Destination {
     }
 }
 
-public class _NavHostCore_BackStackEntry {
+public class _NavHostCore_BackStackEntry: Hashable {
     public let id: String
     fileprivate var isVisible: Bool
     public let destination: NavHostCore.Destination
@@ -262,6 +330,12 @@ public class _NavHostCore_BackStackEntry {
         self.destination = destination
         self.arguments = nil
     }
+    
+    public static func == (lhs: _NavHostCore_BackStackEntry, rhs: _NavHostCore_BackStackEntry) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 public class _NavHostCore_Option {

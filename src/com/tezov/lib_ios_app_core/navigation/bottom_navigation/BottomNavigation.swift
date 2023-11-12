@@ -17,16 +17,18 @@ public struct BottomNavigation: View, ActivitySub {
     }
 
     public var body: some View {
-        BottomNavigationInternal(
+        let view = BottomNavigationInternal(
             items: items,
             selected: _selected,
             onClick: onClick
-        ).layoutPriority(1)
-            .frame(maxWidth: .infinity)
+        )
+        view
+            .layoutPriority(1)
+            .frame(height: view.getTabHeight())
     }
 }
 
-public struct BottomNavigationInternal: UIViewRepresentable {
+internal struct BottomNavigationInternal: UIViewRepresentable {
     let items: [BottomNavigationItem]
     @Binding var selected: Int
     let onClick: (NavigationRouteManager.Route) -> Void // todo remove this and propagate the click through action same as kotlin

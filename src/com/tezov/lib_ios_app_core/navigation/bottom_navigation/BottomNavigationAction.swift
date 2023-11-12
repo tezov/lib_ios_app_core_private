@@ -15,7 +15,7 @@ where StateType: BottomNavigationState.Core {
 }
 
 public class _BottomNavigationAction<S:BottomNavigationState.Core> : ActivitySubAction.Core<S>, BottomNavigationAction.Interface {
-    public typealias StateType = S
     
     override open class var klassIdentifiers: [ObjectIdentifier] { _metaIdentifier }
+    
 }

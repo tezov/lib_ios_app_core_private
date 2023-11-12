@@ -29,14 +29,13 @@ public extension NavHostCore.Graph.Builder {
 
 fileprivate let NAVIGATOR_NAME = "navigator_composable_overlay"
 
-class _ComposableOverlayNavigator: ComposableNavigator.Core {
-    typealias Destination = ComposableOverlayNavigator.Content
+class _ComposableOverlayNavigator: ComposableNavigator.Core<ComposableOverlayNavigator.Content> {
 
     public override var name: String { NAVIGATOR_NAME }
     
-    override func composePrepare(navHost _: NavHost, entry _: NavHostCore.BackStackEntry) { }
+    override func composePrepare(navHost _: NavHostState, entry _: NavHostCore.BackStackEntry) { }
 
-    override func updateCompletion(navHost _: NavHost, entry _: NavHostCore.BackStackEntry) { }
+    override func updateCompletion(navHost _: NavHostState, entry _: NavHostCore.BackStackEntry) { }
 
     override func createGraphEntry(entry: NavHostCore.BackStackEntry) -> ComposableNavigator.GraphEntry {
         return ComposableNavigator.GraphEntry(entry: entry)

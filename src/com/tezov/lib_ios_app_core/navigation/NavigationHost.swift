@@ -3,7 +3,6 @@ import lib_ios_core
 import lib_ios_ui_core
 import SwiftUI
 
-
 private struct _NavigationController_Friend_Object: NavigationController.Friend { }
 
 public struct NavHost: View {
@@ -33,7 +32,8 @@ public struct NavHost: View {
     public var body: some View { state.body }
 }
 
-private class NavHostState: ObservableFlow {
+
+public class NavHostState: ObservableFlow {
     var navController: NavigationController.Core
     var animationConfig: NavigationAnimation.Config
 
@@ -45,6 +45,7 @@ private class NavHostState: ObservableFlow {
         self.animationConfig = animationConfig
         super.init()
         publish(navController.navHostController.$currentBackStack)
+        publish(navController.navHostController.$visibleEntries)
     }
 
     private var entries: [NavHostCore.BackStackEntry] = []
@@ -62,38 +63,38 @@ private class NavHostState: ObservableFlow {
     var lastEntries: [NavHostCore.BackStackEntry]? {
         if entries.count >= 2 {
             if !navController.isIdle && navController.isNavigatingBack {
-                return entries[0...(indexOfLastEntry + 1)].filter { $0.content.isVisible }
+                return entries[0 ... (indexOfLastEntry + 1)].filter { $0.content.isVisible }
             }
             else {
-                return entries[indexOfLastEntry...entries.count].filter { $0.content.isVisible }
+                return entries[indexOfLastEntry ... entries.count].filter { $0.content.isVisible }
             }
         }
         else {
             return nil
         }
     }
-    
+
     var priorEntries: [NavHostCore.BackStackEntry]? {
         if entries.count >= 2 {
-             if !navController.isIdle && navController.isNavigatingBack {
-                 return entries[(indexOfLastEntry + 1)...entries.count].filter { $0.content.isVisible }
+            if !navController.isIdle && navController.isNavigatingBack {
+                return entries[(indexOfLastEntry + 1) ... entries.count].filter { $0.content.isVisible }
             }
             else {
-                return entries[0...indexOfLastEntry].filter { $0.content.isVisible }
+                return entries[0 ... indexOfLastEntry].filter { $0.content.isVisible }
             }
         }
         else {
             return nil
         }
     }
-    
+
     func nextEntryOf(entry: NavHostCore.BackStackEntry) -> NavHostCore.BackStackEntry? {
         if let index = entries.firstIndex(where: { $0 === entry }), index.isNotNilIndex {
             return entries.getOrNil(at: index + 1)
         }
         return nil
     }
-    
+
     func previousEntryOf(entry: NavHostCore.BackStackEntry) -> NavHostCore.BackStackEntry? {
         if let index = entries.firstIndex(where: { $0 === entry }), index.isNotNilIndex {
             return entries.getOrNil(at: index - 1)
@@ -105,64 +106,82 @@ private class NavHostState: ObservableFlow {
     public var body: some View {
         let backQueueState = navController.navHostController.currentBackStack
         let visibleEntriesState = navController.navHostController.visibleEntries
+        CodeBlock {
+            lastEntryId ?! {
+                isLastEntryHasChanged = false
+                lastEntryId = visibleEntriesState.lastOrNil()?.id
+            }
+            updateEntries(
+                backQueueState: backQueueState,
+                visibleEntriesState: visibleEntriesState
+            )
+            if entries.isEmpty { return }
+            for entry in entries {
+                entry.navigator.composePrepare(
+                    navHost: self,
+                    entry: entry
+                )
+            }
+            for entry in entries.reversed() {
+                entry.navigator.updateCompletion(
+                    navHost: self,
+                    entry: entry
+                )
+            }
+            updateTransition()
+            
+            
+            
+        }
         
-        let _ = lastEntryId ?? {
-            isLastEntryHasChanged = false
-            lastEntryId = visibleEntriesState.lastOrNil()?.id
-            return ""
-        }()
-        
-        
+//        for entry in entries {
+//            //                key(entry.id) {
+//            //                    entry.navigator.apply {
+//            //                        completeIfRequested(entry)
+//            //                        compose(
+//            //                            saveableStateHolder = saveableStateHolder,
+//            //                            navHost = this@NavHost,
+//            //                            entry = entry,
+//            //                        )
+//            //                    }
+//            //                }
+//        }
+
         Text("Hello")
         
     }
 
-    
-    
-    //    @Composable
-    //    fun compose(
-    //        backQueue: StateFlow<List<NavBackStackEntry>>,
-    //        visibleEntries: StateFlow<List<NavBackStackEntry>>,
-    //    ) {
-    //        val backQueueState by remember(this) { backQueue }.collectAsState(emptyList())
-    //        val visibleEntriesState by remember(this) { visibleEntries }.collectAsState(emptyList())
-    //
-    //        (lastEntryId ?: let {
-    //            isLastEntryHasChanged = false
-    //            lastEntryId = visibleEntriesState.lastOrNull()?.id
-    //        })
-    //        updateEntries(
-    //            backQueueState = backQueueState,
-    //            visibleEntriesState = visibleEntriesState,
-    //        )
-    //        if (entries.isEmpty()) return
-    //            for (entry in entries) {
-    //            entry.navigator.composePrepare(
-    //                navHost = this@NavHost,
-    //                entry = entry
-    //            )
-    //        }
-    //        for (entry in entries.asReversed()) {
-    //            entry.navigator.updateCompletion(
-    //                navHost = this@NavHost,
-    //                entry = entry
-    //            )
-    //        }
-    //        updateTransition()
-    //        for (entry in entries) {
-    //            key(entry.id) {
-    //                entry.navigator.apply {
-    //                    completeIfRequested(entry)
-    //                    compose(
-    //                        saveableStateHolder = saveableStateHolder,
-    //                        navHost = this@NavHost,
-    //                        entry = entry,
-    //                    )
-    //                }
-    //            }
-    //        }
-    //    }
-    //
+    private func updateEntries(
+        backQueueState: [NavHostCore.BackStackEntry],
+        visibleEntriesState:  [NavHostCore.BackStackEntry]
+    ) {
+        let visibleEntriesStateDistinct = visibleEntriesState.distinctBy { $0.id }
+        let common = entries.intersection(visibleEntriesStateDistinct)
+        common.forEach { commonEntry in
+            let content = commonEntry.content
+            if(!content.isVisible) { content.isVisible = true }
+        }
+        let diff = entries.subtract(visibleEntriesStateDistinct)
+        diff.forEach { diffEntry in
+            if (!backQueueState.contains(diffEntry)) {
+                //entries.remove(diffEntry)
+            }
+        }
+        if (!isNavigatingBack) {
+            let new = visibleEntriesStateDistinct.subtract(entries)
+            new.forEach { newEntry in
+                newEntry.content.isVisible = true
+                entries.append(newEntry)
+            }
+        }
+
+        print(entries.count)
+        print(backQueueState.count)
+        print(visibleEntriesState.count)
+    }
+
+    private func updateTransition() { }
+
     //    @Composable
     //    private fun updateEntries(
     //        backQueueState: List<NavBackStackEntry>,
@@ -203,6 +222,9 @@ private class NavHostState: ObservableFlow {
     //            }
     //        }
     //    }
+
+    
+    
     
     //    private fun ComposableNavigator.Content.updateTransition(
     //        transition: AnimationProgress,
@@ -255,7 +277,10 @@ private class NavHostState: ObservableFlow {
     //            }
     //        }
     //    }
-    //
+
+    
+    
+    
     //    @Composable
     //    private fun updateTransition() {
     //        if (!isLastEntryHasChanged) {
@@ -319,11 +344,4 @@ private class NavHostState: ObservableFlow {
     //        }
     //        transition.start()
     //    }
-    
-    
-
-    
-    
-    
 }
-
